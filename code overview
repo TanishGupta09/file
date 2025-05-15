@@ -1,0 +1,254 @@
+Comprehensive Explanation of the Editorial AI Assistant Code
+
+I'll walk through the main components of your code, explaining both the backend and frontend functionality.
+
+Overview
+
+The Editorial AI Assistant is a Streamlit web application that helps users standardize and correct text in Word documents according to specific style guidelines. It uses Claude AI (via AWS Bedrock) to perform grammar corrections and pattern replacements.
+Backend Components
+1. Configuration Management
+# Config handling (imported from config.py)
+from config import get_llm_config, get_model_id, get_anthropic_version, get_max_tokens, get_service_name, get_region_name
+These functions read configuration settings from a config.ini file, providing parameters for connecting to AWS Bedrock and configuring the AI model.
+2. AWS Integration
+# AWS Bedrock client setup
+client = boto3.client(
+    service_name=get_service_name(),
+    region_name=get_region_name()
+)
+cred = client._get_credentials()
+config_list = [get_llm_config()]
+config_list[0].update({
+    "aws_access_key": cred.access_key,
+    "aws_secret_key": cred.secret_key,
+    "aws_session_token": cred.token,
+})
+This code sets up the AWS Bedrock client with proper credentials to connect to Claude 3.5 Sonnet.
+3. AI Interaction
+def invoke_claude_3_with_text(system_prompt, prompt='You are an AI assistant'):
+    # Function to send requests to Claude AI via AWS Bedrock
+This function handles the interaction with Claude AI, sending prompts and receiving responses. It formats the request with system and user messages and handles response parsing.
+4. Pattern Definitions
+# Define regex patterns for dynamic date/year matching
+YEAR_PATTERN = r'(20\d{2}|\d{2})'
+MONTH_NAMES = r'(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)'
+The code defines regex patterns for identifying various text formats like dates, quarters, and fiscal years.
+5. Country Prefixing
+# List of countries to prefix with "the"
+COUNTRIES_TO_PREFIX = [
+    "UK", "US", "Middle East", "Philippines", "Netherlands", "Czech Republic", "United Arab Emirates", "UAE"
+]
+This list specifies countries that should be prefixed with "the" in proper English.
+6. Replacement Rules Dictionary
+REPLACEMENT_RULES = {
+    "Year-over-Year": {
+        "examples": "yoy, YoY, y/y, Y/Y, y/ y, y o y, YOY, year-on-year, year on year",
+        "target_options": ["YoY", "y/y", "year-on-year"],
+        "default_target":"y/y"
+    },
+    # ... many more rules
+}
+This extensive dictionary defines all the replacement patterns and their target formats, organized by categories like time comparisons, dates, currencies, etc.
+7. Text Processing Functions
+Key text processing functions include:
+def extract_text_from_docx(file_path):
+    # Extract text from DOCX files
+def build_llm_prompt_for_corrections(text, patterns_to_replacements):
+    # Build prompts for the AI model
+def llm_grammar_and_pattern_correction(text, patterns_to_replacements):
+    # Apply AI-based corrections
+def format_replacement(matched_text, replacement_template):
+    # Format dynamic replacements with actual values
+def apply_regex_replacements(text, patterns_to_replacements, dynamic_rules, selected_rules, rule_targets):
+    # Apply regex-based replacements
+def convert_numbers_to_words(text):
+    # Convert numeric digits to words where appropriate
+These functions handle different aspects of text processing, from extraction to formatting and correction.
+8. Document Processing
+def process_paragraph(paragraph, patterns_to_replacements, dynamic_rules, selected_rules, rule_targets, use_llm=True):
+    # Process individual paragraphs
+def create_patterns_dict(selected_rules, rule_targets):
+    # Create patterns dictionary from selected rules
+def create_dynamic_rules_dict(selected_rules):
+    # Create dynamic rules dictionary
+def remove_evaluation_warning(input_file, output_file):
+    # Remove Spire.Doc evaluation warnings
+def compare_documents(original_path, corrected_path, output_path, custom_correction_name=""):
+    # Create tracked changes document
+These functions manage document processing, handling paragraphs, creating rule dictionaries, and comparing documents to show changes.
+9. Main Processing Function
+def process_docx_with_llm(uploaded_file, selected_rules, rule_targets, use_grammar_correction=True, use_country_prefixing=True, custom_correction_name="", progress_callback=None):
+    # Main function to process DOCX files
+This is the main function that orchestrates the document processing workflow, from file upload to creating the final document with tracked changes.
+Processing Flow (Backend)
+1. The user uploads a document and selects style rules
+2. The system creates temporary files to work with
+3. It processes each paragraph and table cell using:
+• AI-based grammar correction (if enabled)
+• Pattern replacement using regex
+• Number-to-word conversion
+• Number formatting
+4. It compares the original and corrected documents, creating a version with tracked changes
+5. It returns the processed document for download
+Frontend Components (in the separate code)
+The frontend code uses Streamlit to create a user-friendly web interface with these key components:
+1. Page Configuration
+st.set_page_config(
+    page_title="Editorial AI Assistant",
+    page_icon="📝",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+Sets up the overall page structure and appearance.
+2. Custom CSS
+def local_css():
+    st.markdown("""
+    <style>
+    .main-header {
+        font-size: 2.5rem;
+        # ... more CSS styles
+    }
+    </style>
+    """, unsafe_allow_html=True)
+Defines custom styling for a more polished user interface.
+3. Header Display
+def display_header():
+    st.markdown('<h1 class="main-header">Editorial AI Assistant</h1>', unsafe_allow_html=True)
+    # ... additional header content
+Creates the application header with information about the tool.
+4. Style Format Management
+def display_style_manager(style_formats):
+    # Function to manage saved style formats
+Allows users to save, load, and manage style format presets.
+5. Rule Selection Interface
+def display_rule_selection():
+    # Display UI for selecting style rules
+Creates the interface for users to select which style rules to apply.
+6. Target Format Selection
+def display_target_selection(selected_rules):
+    # Interface for choosing target formats
+Lets users choose the specific output format for each selected rule.
+7. Document Processing Interface
+def display_document_processor(style_formats, selected_format):
+    # Main document processing interface
+Handles file uploads, processing options, and document processing.
+User Flow (Frontend)
+1. User visits the app and sees the header with tool information
+2. They can select a saved style format or create a custom one by:
+• Selecting specific rules to apply
+• Choosing target formats for each rule
+3. They upload a document for processing
+4. They can set additional options like:
+• Custom name for tracked changes
+• Grammar correction toggle
+• Country prefixing toggle
+5. After clicking "Process Document", they see:
+• A progress bar during processing
+• Success message when complete
+• Download button for the processed document
+• Processing summary with stats
+Integration Points
+• The frontend calls process_docx_with_llm() from the backend when the user clicks "Process Document"
+• The backend uses AWS credentials to access Claude AI via Bedrock
+• The result is a downloadable document with tracked changes showing all corrections
+Error Handling
+The code includes extensive error handling throughout:
+• Try-except blocks around AWS API calls
+• Error handling for document loading and saving
+• Progress updates during processing
+• User-friendly error messages displayed in the Streamlit interface
+Style Sheet Format
+In your implementation, the style formatting can be saved and loaded. Style formats contain:
+6. A list of selected rules to apply
+7. The target format for each rule
+For example, a style format might specify that:
+• "Year-over-Year" should be formatted as "y/y"
+• Quarters should be formatted as "1Q23" (not "Q1 2023")
+• Currency should be displayed as "USD" (not "$")
+Advanced Features
+1. Grammar Correction
+The AI doesn't just replace patterns - it also corrects grammar issues in the text using Claude's language capabilities.
+if use_llm:
+    processed_text = llm_grammar_and_pattern_correction(text, patterns_to_replacements)
+2. Number to Word Conversion
+The system intelligently converts numbers to words where appropriate:
+final_text = convert_numbers_to_words(final_text)
+For example, "1 person" becomes "one person", but numbers in dates, percentages or measurements remain as digits.
+3. Country Prefixing
+The system adds "the" before countries that require it grammatically:
+# Always apply country prefixing with "the" - using a safer approach
+words = modified_text.split()
+for i in range(len(words)):
+    # Check if the current word matches a country
+    for country in COUNTRIES_TO_PREFIX:
+        if words[i].lower() == country.lower() or words[i].lower() == country.lower() + ',' or words[i].lower() == country.lower() + '.':
+            # Check if the previous word is not "the"
+            if i == 0 or words[i-1].lower() != "the":
+                # Handle punctuation
+                if words[i][-1] in [',', '.', ':', ';', '?', '!']:
+                    punctuation = words[i][-1]
+                    words[i] = "the " + country + punctuation
+                else:
+                    words[i] = "the " + country
+4. Tracked Changes
+One of the most valuable features is that all changes are tracked, allowing users to see and accept/reject modifications:
+def compare_documents(original_path, corrected_path, output_path, custom_correction_name=""):
+    # ...
+    original_doc.TrackChanges = True
+    # ...
+    original_doc.Compare(corrected_doc, correction_name)
+Performance Considerations
+The code uses several techniques to optimize performance:
+8. Temporary Files: Using tempfile.TemporaryDirectory() for secure, efficient file handling
+9. Memory Management: Using BytesIO for in-memory document processing
+10. Process Tracking: Counting items and providing progress updates
+11. Selective Processing: Only processing non-empty paragraphs
+12. Avoiding Duplicate Processing: Tracking processed ranges to prevent overlapping replacements
+Code Structure and Organization
+The code follows a modular design with clear separation of concerns:
+13. Configuration Management: Handled by config.py
+14. AI Integration: Functions for interacting with Claude AI
+15. Text Processing: Functions for manipulating and formatting text
+16. Document Handling: Functions for working with DOCX files
+17. UI Components: Streamlit functions for the user interface
+18. Style Management: Functions for saving/loading style formats
+Customization Points
+The system is designed to be highly customizable:
+19. Rule Selection: Users can select which rules to apply
+20. Target Formats: Each rule can have multiple target format options
+21. Style Formats: Users can save and load combinations of rules and formats
+22. Processing Options: Toggle grammar correction and country prefixing
+23. Custom Correction Name: Users can set a custom name for tracked changes
+Security Considerations
+The code includes several security best practices:
+24. Temporary Files: Using the tempfile module for secure file handling
+25. Credential Management: AWS credentials are handled safely
+26. Input Validation: Checking file types and content before processing
+27. Error Handling: Robust error handling to prevent crashes
+Limitations
+The current implementation has a few limitations:
+28. AI Quota/Cost: Each API call to Claude costs money or uses quota
+29. Rule Complexity: Some complex formatting patterns might be missed
+30. Language Support: The system is primarily designed for English text
+31. Processing Speed: Large documents might take significant time to process
+Extensibility
+The code is designed to be easily extended:
+32. Additional Rules: New rules can be added to the REPLACEMENT_RULES dictionary
+33. New Target Formats: Additional format options can be added to existing rules
+34. AI Model Selection: The system could be updated to use different AI models
+35. Output Formats: Currently outputs DOCX, but could be extended to other formats
+Connection between Frontend and Backend
+36. State Management: Streamlit's session state stores selected rules and targets
+37. Processing Flow:
+• Frontend collects user selections and file uploads
+• Backend processes the document based on those selections
+• Frontend displays results and provides download options
+38. Progress Updates: Backend reports progress to frontend via callback
+Final Note
+The Editorial AI Assistant is a sophisticated application that combines:
+39. AI-powered text correction
+40. Pattern-based formatting standardization
+41. Document comparison and tracking
+42. User-friendly interface
+It's designed to help users maintain consistent style in their documents, particularly for financial and business content with specialized terminology and formatting requirements.
+The combination of AI grammar correction with rule-based pattern replacement provides a powerful solution for ensuring document consistency while maintaining the original meaning and context.
